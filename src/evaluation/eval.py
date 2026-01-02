@@ -81,6 +81,17 @@ REWARDBENCH_SUBSET_MAPPING = {
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 
+def resolve_response_path(base_folder, dataset_name):
+    candidates = [
+        os.path.join(base_folder, dataset_name),
+        os.path.join(base_folder, f"{dataset_name}.json"),
+        os.path.join(base_folder, f"{dataset_name}.jsonl"),
+    ]
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            return candidate
+    return None
+
 def extract_score(text):
     match = re.search(
         r'(?:\\?"score\\?"|score)\s*:\s*'
@@ -156,6 +167,7 @@ def evaluate_bbh(response_path, output_path):
         "Failed Parses": int(failed_count)
     }
 
+    logging.info(f"BBH summary: {summary}")
     with open(output_path, "w") as f:
         json.dump(summary, f, indent=4)
 
@@ -221,6 +233,7 @@ def evaluate_feedbackbench(response_path, output_path):
         "Failed Parses": int(failed_count)
     }
 
+    logging.info(f"FeedbackBench summary: {summary}")
     with open(output_path, "w") as f:
         json.dump(summary, f, indent=4)
 
@@ -298,6 +311,7 @@ def evaluate_mmlustem(response_path, output_path):
         "Per-Subject Accuracy": sorted(subject_stats, key=lambda x: x["subject"])
     }
 
+    logging.info(f"MMLU-STEM summary: {summary}")
     with open(output_path, "w") as f:
         json.dump(summary, f, indent=4)
 
@@ -504,6 +518,7 @@ def evaluate_xsum_faithfulness(response_path, output_path, split):
         "Failed Parses": int(failed_count)
     }
 
+    logging.info(f"XSUM ({split}) summary: {summary}")
     with open(output_path, "w") as f:
         json.dump(summary, f, indent=4)
 
@@ -569,6 +584,7 @@ def evaluate_xsum(response_path, output_path, split):
         "Failed Parses": int(failed_count)
     }
 
+    logging.info(f"XSUM ({split}) summary: {summary}")
     with open(output_path, "w") as f:
         json.dump(summary, f, indent=4)
 
@@ -612,10 +628,12 @@ if __name__ == "__main__":
     if len(eval_dataset_list) == 0:
         raise ValueError("Evaluation datasets cannot be empty!")
     
+    os.makedirs(args.output_folder_path, exist_ok=True)
     for dataset_name in eval_dataset_list:
-        response_path = os.path.join(args.response_folder_path, dataset_name)
-        output_path = os.path.join(args.output_folder_path, dataset_name)
-        if os.path.exists(response_path):
+        response_path = resolve_response_path(args.response_folder_path, dataset_name)
+        if response_path:
+            logging.info(f"Using response file `{response_path}` for `{dataset_name}`")
+            output_path = os.path.join(args.output_folder_path, f"{dataset_name}.json")
             if dataset_name == "RM-Bench":
                 evaluate_rmbench(response_path, output_path=output_path)
             elif dataset_name == "reward-bench": # 2985 pairs
@@ -629,7 +647,7 @@ if __name__ == "__main__":
             elif dataset_name.startswith("XSUM"):
                 split = dataset_name.split("_")[-1]
                 if dataset_name == "XSUM_faithfulness":
-                    evaluate_xsum_faithfulness(args.response_path, output_path=output_path, split=split)
+                    evaluate_xsum_faithfulness(response_path, output_path=output_path, split=split)
                 else:
                     evaluate_xsum(response_path, output_path=output_path, split=split)
             else:
@@ -637,4 +655,4 @@ if __name__ == "__main__":
             
             logging.info(f"Successfully evaluated `{dataset_name}`, saving to `{output_path}`")
         else:
-            raise ValueError(f"Response path `{response_path}` does not exist!")
+            raise ValueError(f"Response path for `{dataset_name}` does not exist under `{args.response_folder_path}`!")
