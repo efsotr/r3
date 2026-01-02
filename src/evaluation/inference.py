@@ -212,6 +212,7 @@ if __name__ == '__main__':
 
     # Check if need to initialize vLLM
     use_vllm = model_config.get('use_vllm', False)
+    file_ext = ".json" if use_vllm else ".jsonl"
     model_id = model_config.get('model_id')
     if use_vllm:
         # Initialize vLLM model globally (once)
@@ -227,12 +228,17 @@ if __name__ == '__main__':
         MODEL = LLM(model_id, tensor_parallel_size=tensor_parallel_size, **model_config.get("model_args", {}))
 
     for dataset_name in eval_dataset_list:
-        save_name = f"{'-'.join(dataset_name.split('-')[2:])}.json"
-        save_path = os.path.join(output_folder, save_name)
+        base_save_name = "-".join(dataset_name.split("-")[2:])
         if dataset_name != "rubricreward/R3-eval-XSUM":
+            save_name = f"{base_save_name}{file_ext}"
+            save_path = os.path.join(output_folder, save_name)
             generate_response(dataset_name, "train", save_path,
                               model_config, args.debug)
+            logging.info(f"Saved responses for `{dataset_name}` to `{save_path}`")
         else:
             for metric in ["faithfulness", "coherence", "relevance"]:
+                save_name = f"{base_save_name}_{metric}{file_ext}"
+                save_path = os.path.join(output_folder, save_name)
                 generate_response(dataset_name, metric, save_path,
                                    model_config, args.debug)
+                logging.info(f"Saved responses for `{dataset_name}` split `{metric}` to `{save_path}`")
